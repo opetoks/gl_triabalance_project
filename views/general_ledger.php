@@ -1,12 +1,11 @@
 <?php
 include('includes/db.php');
-// Pagination
+
 $perPage = isset($_GET['perPage']) ? intval($_GET['perPage']) : 50;
 $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
 $page = max(1, $page);
 $offset = ($page - 1) * $perPage;
 
-// Sorting
 $allowedSort = ['acct_code','date_of_payment','debit','credit'];
 $sort = isset($_GET['sort']) && in_array($_GET['sort'], $allowedSort)
         ? $_GET['sort']
@@ -16,9 +15,8 @@ $order = (isset($_GET['order']) && strtolower($_GET['order']) === 'asc')
             ? 'ASC'
             : 'DESC';
 
-// Main GL Query
 $sql = "
-SELECT 
+SELECT
     a.acct_id,
     a.acct_code,
     a.acct_alias,
@@ -44,7 +42,6 @@ $stmt->bindValue(':perPage', $perPage, PDO::PARAM_INT);
 $stmt->execute();
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Count total rows for pagination
 $countSql = "
 SELECT COUNT(*) AS total
 FROM account_general_transaction_new
@@ -76,9 +73,11 @@ $grandTotalCredit = floatval($totalsResult['total_credit']);
 //echo $grandTotalCredit;
 ?>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>General Ledger</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>General Ledger - Accounting System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
@@ -88,14 +87,21 @@ $grandTotalCredit = floatval($totalsResult['total_credit']);
     </style>
 </head>
 
-<body class="bg-gray-100">
+<body class="bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
 
 <div class="w-full mx-auto p-6">
 
-    <!-- HEADER -->
-    <div class="mb-6">
-        <h1 class="text-3xl font-bold text-gray-700">📘 General Ledger</h1>
-        <p class="text-gray-500 mt-1">All approved debit and credit entries from the accounting system.</p>
+    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-4xl font-bold text-gray-800 mb-2">General Ledger</h1>
+                <p class="text-gray-600">Comprehensive record of all approved accounting transactions</p>
+            </div>
+            <div class="text-right">
+                <div class="text-sm text-gray-500 mb-1">Total Entries</div>
+                <div class="text-3xl font-bold text-blue-600"><?= number_format($totalRows) ?></div>
+            </div>
+        </div>
     </div>
 
     <div class="bg-white rounded-xl shadow-lg p-6 mb-6 no-print">
@@ -135,49 +141,83 @@ $grandTotalCredit = floatval($totalsResult['total_credit']);
     <div class="overflow-x-auto bg-white shadow rounded-lg">
         <table class="min-w-full table-striped text-sm" id="gltTable">
 
-            <thead class="bg-gray-50">
-                <tr>
-                    <th class="px-4 py-3 text-left">Date</th>
-                    <th class="px-4 py-3 text-left">Account Code</th>
-                    <th class="px-4 py-3 text-left">Account Name</th>
-                    <th class="px-4 py-3 text-left">Description</th>
-                    <th class="px-4 py-3 text-center">Dr</th>
-                    <th class="px-4 py-3 text-center">Cr</th>
-                    <th class="px-4 py-3 text-center">Ref</th>
-                    <th class="px-4 py-3 text-center">Action</th>
-                </tr>
-            </thead>
+                <?php foreach ($rows as $r): ?>
+                    <tr class="hover:bg-blue-50 transition-colors duration-150">
 
-            <tbody id="glTable" class="divide-y">
+                        <td class="px-6 py-4 text-gray-700 whitespace-nowrap font-medium"><?= htmlspecialchars($r['date_of_payment']) ?></td>
 
-            <?php foreach ($rows as $r): ?>
-                <tr class="hover:bg-blue-50 transition">
+                        <td class="px-6 py-4 font-semibold text-gray-900"><?= htmlspecialchars($r['acct_code']) ?></td>
 
-                    <td class="px-4 py-2 text-gray-700"><?= htmlspecialchars($r['date_of_payment']) ?></td>
+                        <td class="px-6 py-4 text-gray-700"><?= htmlspecialchars($r['acct_alias'] ?: $r['acct_desc']) ?></td>
 
                     <td class="px-4 py-2 font-semibold"><a href="ledger_account.php?acct_id=<?php echo $r['acct_id']; ?>"> <?= htmlspecialchars($r['acct_code']) ?> </a></td>
 
-                    <td class="px-4 py-2 text-gray-700"><?= htmlspecialchars($r['acct_alias'] ?: $r['acct_desc']) ?></td>
+                        <td class="px-6 py-4 text-right">
+                            <?php if ($r['debit'] > 0): ?>
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-emerald-100 text-emerald-800">
+                                    <?= number_format($r['debit'], 2) ?>
+                                </span>
+                            <?php else: ?>
+                                <span class="text-gray-400">—</span>
+                            <?php endif; ?>
+                        </td>
 
-                    <td class="px-4 py-2 text-gray-600"><?= htmlspecialchars($r['transaction_desc']) ?></td>
+                        <td class="px-6 py-4 text-right">
+                            <?php if ($r['credit'] > 0): ?>
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-rose-100 text-rose-800">
+                                    <?= number_format($r['credit'], 2) ?>
+                                </span>
+                            <?php else: ?>
+                                <span class="text-gray-400">—</span>
+                            <?php endif; ?>
+                        </td>
 
-                    <!-- DR -->
-                    <td class="px-4 py-2 text-center">
-                        <?php if ($r['debit'] > 0): ?>
-                            <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full">
-                                <?= number_format($r['debit'], 2) ?>
+                        <td class="px-6 py-4 text-center text-gray-600 text-sm">
+                            <?= htmlspecialchars($r['receipt_no']) ?>
+                        </td>
+
+                        <td class="px-6 py-4 text-center no-print">
+                            <a href="view_transaction.php?id=<?= $r['txn_id'] ?>"
+                               class="inline-flex items-center px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition font-medium text-sm">
+                               View
+                            </a>
+                        </td>
+
+                    </tr>
+                <?php endforeach; ?>
+
+                </tbody>
+
+                <tfoot class="bg-gradient-to-r from-gray-100 to-gray-200 border-t-2 border-gray-300">
+                    <tr>
+                        <td colspan="4" class="px-6 py-4 text-right font-bold text-gray-800 text-lg">Page Totals:</td>
+                        <td class="px-6 py-4 text-right">
+                            <span class="inline-flex items-center px-4 py-2 rounded-lg text-base font-bold bg-emerald-200 text-emerald-900">
+                                <?= number_format($pageDebitTotal, 2) ?>
                             </span>
-                        <?php else: ?> — <?php endif; ?>
-                    </td>
-
-                    <!-- CR -->
-                    <td class="px-4 py-2 text-center">
-                        <?php if ($r['credit'] > 0): ?>
-                            <span class="bg-red-100 text-red-700 px-3 py-1 rounded-full">
-                                <?= number_format($r['credit'], 2) ?>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <span class="inline-flex items-center px-4 py-2 rounded-lg text-base font-bold bg-rose-200 text-rose-900">
+                                <?= number_format($pageCreditTotal, 2) ?>
                             </span>
-                        <?php else: ?> — <?php endif; ?>
-                    </td>
+                        </td>
+                        <td colspan="2" class="px-6 py-4"></td>
+                    </tr>
+                    <tr class="bg-gradient-to-r from-gray-700 to-gray-800 text-white">
+                        <td colspan="4" class="px-6 py-4 text-right font-bold text-lg">Grand Totals (All Pages):</td>
+                        <td class="px-6 py-4 text-right">
+                            <span class="inline-flex items-center px-4 py-2 rounded-lg text-base font-bold bg-emerald-600 text-white">
+                                <?= number_format($grandTotalDebit, 2) ?>
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <span class="inline-flex items-center px-4 py-2 rounded-lg text-base font-bold bg-rose-600 text-white">
+                                <?= number_format($grandTotalCredit, 2) ?>
+                            </span>
+                        </td>
+                        <td colspan="2" class="px-6 py-4"></td>
+                    </tr>
+                </tfoot>
 
                     <td class="px-4 py-2 text-center text-gray-600">
                         <?= htmlspecialchars($r['receipt_no']) ?>
@@ -233,46 +273,78 @@ $grandTotalCredit = floatval($totalsResult['total_credit']);
     <!-- PAGINATION -->
     <div class="flex justify-between items-center mt-6 no-print">
 
-        <!-- Page info -->
-        <p class="text-gray-600">
-            Page <?= $page ?> of <?= $totalPages ?>  
-            (<?= number_format($totalRows) ?> records)
-        </p>
+            <div class="text-gray-700">
+                <span class="font-semibold">Page <?= $page ?></span> of <span class="font-semibold"><?= $totalPages ?></span>
+                <span class="text-gray-500 ml-2">(<?= number_format($totalRows) ?> total records)</span>
+            </div>
 
-        <!-- Buttons -->
-        <div class="flex space-x-2">
+            <div class="flex items-center gap-2">
 
-            <?php if ($page > 1): ?>
-                <a href="?page=<?= $page-1 ?>&perPage=<?= $perPage ?>"
-                   class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Prev</a>
-            <?php endif; ?>
+                <?php if ($page > 1): ?>
+                    <a href="?page=1&perPage=<?= $perPage ?>"
+                       class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium">
+                       First
+                    </a>
+                    <a href="?page=<?= $page-1 ?>&perPage=<?= $perPage ?>"
+                       class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">
+                       Previous
+                    </a>
+                <?php endif; ?>
 
-            <?php if ($page < $totalPages): ?>
-                <a href="?page=<?= $page+1 ?>&perPage=<?= $perPage ?>"
-                   class="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400">Next</a>
-            <?php endif; ?>
+                <?php
+                $startPage = max(1, $page - 2);
+                $endPage = min($totalPages, $page + 2);
+                for ($i = $startPage; $i <= $endPage; $i++):
+                ?>
+                    <a href="?page=<?= $i ?>&perPage=<?= $perPage ?>"
+                       class="px-4 py-2 <?= $i == $page ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300' ?> rounded-lg transition font-medium">
+                       <?= $i ?>
+                    </a>
+                <?php endfor; ?>
+
+                <?php if ($page < $totalPages): ?>
+                    <a href="?page=<?= $page+1 ?>&perPage=<?= $perPage ?>"
+                       class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">
+                       Next
+                    </a>
+                    <a href="?page=<?= $totalPages ?>&perPage=<?= $perPage ?>"
+                       class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-medium">
+                       Last
+                    </a>
+                <?php endif; ?>
+
+            </div>
+
+            <div>
+                <select onchange="window.location.href='?page=1&perPage=' + this.value"
+                        class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                    <option value="25" <?= $perPage == 25 ? 'selected' : '' ?>>25 per page</option>
+                    <option value="50" <?= $perPage == 50 ? 'selected' : '' ?>>50 per page</option>
+                    <option value="100" <?= $perPage == 100 ? 'selected' : '' ?>>100 per page</option>
+                    <option value="200" <?= $perPage == 200 ? 'selected' : '' ?>>200 per page</option>
+                </select>
+            </div>
 
         </div>
     </div>
 
 </div>
 
-<!-- FRONT-END SEARCH -->
 <script>
-document.getElementById("glSearch").addEventListener("keyup", function() {
-    const filter = this.value.toLowerCase();
-    const rows = document.querySelectorAll("#glTable tr");
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById("glSearch");
+    const tableRows = document.querySelectorAll("#glTable tr");
 
-    rows.forEach(row => {
-        row.style.display = row.textContent.toLowerCase().includes(filter)
-            ? ""
-            : "none";
+    searchInput.addEventListener("keyup", function() {
+        const filter = this.value.toLowerCase();
+
+        tableRows.forEach(row => {
+            const text = row.textContent.toLowerCase();
+            row.style.display = text.includes(filter) ? "" : "none";
+        });
     });
 });
-</script>
 
-<script>
-// Excel Export
 function exportExcel() {
     const table = document.getElementById("gltTable");
 
